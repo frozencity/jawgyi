@@ -1,0 +1,33 @@
+jawgyi
+Copyright 2026 jawgyi contributors
+Dual licensed: MIT OR WTFPL, at your option. See LICENSE.
+
+The dual license applies to jawgyi's own code. It does not and cannot relicense the
+Google-derived files listed below, which remain under the Apache License 2.0.
+
+==============================================================================
+This product includes software developed by Google LLC.
+
+The Zawgyi/Unicode Markov classifier (src/vendor/markov.ts), the trained model
+(src/vendor/zawgyiUnicodeModel.dat and the generated src/vendor/model-data.ts),
+the transliteration engine (src/vendor/translit.ts) and the transliteration rule
+tables (src/vendor/translit/*) are derived from Google's myanmar-tools:
+
+    https://github.com/google/myanmar-tools
+    Copyright 2017 Google LLC
+    Licensed under the Apache License, Version 2.0
+
+    You may obtain a copy of the License at
+    http://www.apache.org/licenses/LICENSE-2.0
+
+The full Apache-2.0 text as shipped by myanmar-tools is retained at
+src/vendor/LICENSE-myanmar-tools.md.
+
+Modifications from upstream are documented in the header of each vendored file.
+They are limited to build and runtime mechanics, plus one behavioural change:
+the classifier returns null rather than -Infinity when a string contains no
+Myanmar-range code points.
+
+The test fixtures under test/fixtures/ are also from myanmar-tools. The UDHR
+Burmese text originates with the Office of the High Commissioner for Human
+Rights and the Unicode UDHR project.

@@ -1,0 +1,16 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+shared/cross-check-input.json
+python/.venv/
+python/**/__pycache__/
+python/*.egg-info/
+.pytest_cache/
+
+# Assistant tooling, local only
+CLAUDE.md
+CLAUDE.local.md
+.claude/
+.claude-plugin/
+.mcp.json

@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "jawgyi"
+version = "0.1.0"
+description = "Zawgyi vs Unicode detection for Burmese text, with an optional Jev (TypeSafe System One) stage for ambiguous cases."
+readme = "README.md"
+requires-python = ">=3.9"
+# Dual licensed. The vendored Google assets stay Apache-2.0 regardless; see NOTICE.
+license = "MIT OR WTFPL"
+license-files = ["LICENSE", "NOTICE", "LICENSE-myanmar-tools.md"]
+keywords = ["zawgyi", "unicode", "myanmar", "burmese", "encoding", "detection", "jev", "typesafe"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.9",
+  "Topic :: Text Processing :: Linguistic",
+]
+# No runtime dependencies. The Jev stage speaks HTTP through urllib so that a
+# batch pipeline does not inherit an HTTP client it did not ask for.
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jawgyi"]
+
+# packages above already carries src/jawgyi/data, so force-including it again would
+# write every data file into the wheel twice.
+#
+# The wheel ships Google's Apache-2.0 model and rule tables, so it has to carry the
+# attribution and the licence text with them. Shipping NOTICE without the Apache text
+# it points at is not attribution.
+[tool.hatch.build.targets.wheel.force-include]
+"NOTICE" = "jawgyi/NOTICE"
+"LICENSE-myanmar-tools.md" = "jawgyi/LICENSE-myanmar-tools.md"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

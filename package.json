@@ -1,0 +1,52 @@
+{
+  "name": "jawgyi",
+  "version": "0.1.0",
+  "description": "Zawgyi vs Unicode detection for Burmese text. Fast local Markov + codepoint analysis, with an optional Jev (TypeSafe System One) stage for the ambiguous cases.",
+  "keywords": [
+    "zawgyi",
+    "unicode",
+    "myanmar",
+    "burmese",
+    "encoding",
+    "detection",
+    "jev",
+    "typesafe"
+  ],
+  "license": "(MIT OR WTFPL)",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/esm/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/esm/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "NOTICE",
+    "LICENSE",
+    "src/vendor/LICENSE-myanmar-tools.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build:model": "node scripts/build-vendor.mjs",
+    "build": "npm run build:model && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/fix-cjs.mjs",
+    "test": "npm run build:model && node --test --experimental-strip-types test/*.test.ts",
+    "prepublishOnly": "npm run build && npm test",
+    "calibrate": "npm run build && node scripts/calibrate.mjs",
+    "derive": "node scripts/derive-codepoints.mjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "cross-check": "npm run build && node scripts/cross-check.mjs",
+    "calibrate:dry": "npm run build && node scripts/calibrate.mjs --dry-run"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
