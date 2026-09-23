@@ -22,6 +22,7 @@ from .detect import (
     is_zawgyi,
     should_escalate,
 )
+from .direct import DIRECT_QUESTION_ID, DirectVerdict, build_direct_question, is_jawgyi
 from .jev import JevClient, TypeSafeError, build_questions, build_state, resolve_with_jev
 from .markov import markov_zawgyi_probability
 from .types import Detection, Encoding, Evidence, JevResolution, SystemOneClient
@@ -39,6 +40,10 @@ __all__ = [
     "detect_sync",
     "to_unicode",
     "is_zawgyi",
+    "is_jawgyi",
+    "DirectVerdict",
+    "build_direct_question",
+    "DIRECT_QUESTION_ID",
     "should_escalate",
     "scan_codepoints",
     "verdict_from_codepoints",

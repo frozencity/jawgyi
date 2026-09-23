@@ -19,6 +19,7 @@ from jawgyi import (
     unicode_to_zawgyi,
     zawgyi_to_unicode,
 )
+from jawgyi.direct import DIRECT_QUESTION_ID, build_direct_question, is_jawgyi
 from jawgyi.jev import AS_WRITTEN, IF_CONVERTED, IS_BURMESE, IS_MIXED, NEITHER, READING
 
 FIXTURES = Path(__file__).resolve().parents[2] / "test" / "fixtures"
@@ -360,3 +361,69 @@ class TestRegressions:
         repo = Path(__file__).resolve().parents[2]
         shipped = (resources.files("jawgyi.data") / "zawgyiUnicodeModel.dat").read_bytes()
         assert shipped == (repo / "shared" / "zawgyiUnicodeModel.dat").read_bytes()
+
+
+class TestDirect:
+    """is_jawgyi: the single-question path."""
+
+    class Stub:
+        def __init__(self, noul: float) -> None:
+            self.noul = noul
+            self.requests: list[dict[str, Any]] = []
+
+        def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
+            self.requests.append(request)
+            return {
+                "model": "jev-1.13.0",
+                "answers": {DIRECT_QUESTION_ID: {"type": "noul", "noul": self.noul}},
+                "usage": {"input_tokens": 120, "output_tokens": 8},
+            }
+
+    def test_sends_one_noul_with_bare_text_as_state(self) -> None:
+        s = self.Stub(0.9)
+        is_jawgyi("ကဳ", s)
+        q = s.requests[0]["questions"][DIRECT_QUESTION_ID]
+        assert q["type"] == "noul"
+        assert "Zawgyi font encoding" in q["instructions"]
+        # Bare text, not the two candidate readings that resolve_with_jev builds.
+        assert s.requests[0]["state"] == "ကဳ"
+
+    def test_reports_the_local_answer_alongside(self) -> None:
+        v = is_jawgyi(ZAWGYI_DOC, self.Stub(0.02))
+        assert v.zawgyi is False
+        assert v.stage1.encoding == "zawgyi"
+        assert v.disagrees is True
+        assert "decoded code points" in v.note
+
+    def test_local_abstention_is_not_a_disagreement(self) -> None:
+        v = is_jawgyi(AMBIGUOUS, self.Stub(0.99))
+        assert v.stage1.encoding is None
+        assert v.disagrees is False
+
+    def test_rejects_a_non_noul_answer(self) -> None:
+        class Wrong:
+            def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
+                return {
+                    "model": "m",
+                    "answers": {DIRECT_QUESTION_ID: {"type": "choice", "choice": "x"}},
+                    "usage": {},
+                }
+
+        with pytest.raises(ValueError, match="Expected a noul"):
+            is_jawgyi("ကဳ", Wrong())
+
+    def test_matches_the_typescript_question_verbatim(self) -> None:
+        # The two packages must send byte-identical questions or their numbers are not
+        # comparable, and comparing them is the entire reason this path exists.
+        import json
+        import re
+
+        ts = (Path(__file__).resolve().parents[2] / "src" / "jev" / "direct.ts").read_text("utf-8")
+        py = json.dumps(build_direct_question(), sort_keys=True)
+        for field in ("Is this text encoded in the Zawgyi font encoding rather than Unicode?",
+                      "The text is Zawgyi encoded.",
+                      "The text is Unicode encoded."):
+            assert field in ts, f"TypeScript is missing {field!r}"
+            assert field in py, f"Python is missing {field!r}"
+        assert re.search(r"DIRECT_QUESTION_ID = 'is_it_zawgyi'", ts)
+        assert DIRECT_QUESTION_ID == "is_it_zawgyi"

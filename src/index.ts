@@ -14,6 +14,9 @@ export { zawgyiToUnicode, unicodeToZawgyi, normalizeZawgyi } from './convert.ts'
 export { JevClient, TypeSafeError, type ClientOptions } from './jev/client.ts';
 export { resolveWithJev, type JevResolution } from './jev/resolve.ts';
 export { buildQuestions, buildState, QUESTION_IDS, OPTIONS, THRESHOLDS } from './jev/questions.ts';
+
+/** Single-question encoding classification via Jev. See `isZawgyi` for the local path. */
+export { isJawgyi, buildDirectQuestion, DIRECT_QUESTION_ID, type DirectVerdict } from './jev/direct.ts';
 export { scanCodepoints, verdictFromCodepoints, type CodepointEvidence } from './codepoints.ts';
 export type {
   Detection,

@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { detect, detectSync, toUnicode, JevClient, TypeSafeError } from '../src/index.ts';
 import { buildQuestions, buildState, OPTIONS, QUESTION_IDS } from '../src/jev/questions.ts';
 import { StubClient } from './stub.ts';
+import { isJawgyi, DIRECT_QUESTION_ID } from '../src/jev/direct.ts';
 import type { SystemOneClient, SystemOneRequest } from '../src/types.ts';
 
 const fixtures = join(dirname(fileURLToPath(import.meta.url)), 'fixtures');
@@ -302,6 +303,70 @@ describe('regressions', () => {
     assert.equal(converted, false);
     assert.equal(text, spiked, 'a conflicted document must never be rewritten');
     assert.equal(client.requests.length, 1, 'a conflict is worth asking about');
+  });
+});
+
+describe('isJawgyi, the single-question path', () => {
+
+  const naiveStub = (noul: number): SystemOneClient & { requests: SystemOneRequest[] } => {
+    const requests: SystemOneRequest[] = [];
+    return {
+      requests,
+      async evaluate(req: SystemOneRequest) {
+        requests.push(req);
+        return {
+          model: 'jev-1.13.0',
+          answers: { [DIRECT_QUESTION_ID]: { type: 'noul' as const, noul } },
+          usage: { input_tokens: 120, output_tokens: 8 },
+        };
+      },
+    };
+  };
+
+  test('sends one noul with the text as bare state', async () => {
+    const client = naiveStub(0.9);
+    await isJawgyi('\u1000\u1033', client);
+    const q = client.requests[0]!.questions[DIRECT_QUESTION_ID]!;
+    assert.equal(q.type, 'noul');
+    assert.match(String(q.instructions), /Zawgyi font encoding/);
+    // The state is the bare text, not the two candidate readings that detect builds.
+    assert.equal(client.requests[0]!.state, '\u1000\u1033');
+  });
+
+  test('reports the local answer alongside, so the disagreement is visible', async () => {
+    const zawgyiDoc = read('udhr_mya_zawgyi_out.txt');
+    const v = await isJawgyi(zawgyiDoc, naiveStub(0.02));
+    assert.equal(v.zawgyi, false, 'Jev said unicode');
+    assert.equal(v.stage1.encoding, 'zawgyi', 'the local detector said zawgyi');
+    assert.equal(v.disagrees, true);
+    assert.match(v.note, /decoded code points/);
+  });
+
+  test('a stage 1 abstention is not counted as a disagreement', async () => {
+    // A local null is an abstention, not a competing verdict.
+    const v = await isJawgyi(AMBIGUOUS, naiveStub(0.99));
+    assert.equal(v.stage1.encoding, null);
+    assert.equal(v.disagrees, false);
+  });
+
+  test('returns an object rather than a boolean', async () => {
+    const v = await isJawgyi('\u1000\u1033', naiveStub(0.9));
+    assert.equal(typeof v, 'object');
+    assert.equal(typeof v.zawgyi, 'boolean');
+    assert.equal(v.noul, 0.9);
+  });
+
+  test('throws if the answer is not a noul', async () => {
+    const wrong: SystemOneClient = {
+      async evaluate() {
+        return {
+          model: 'm',
+          answers: { [DIRECT_QUESTION_ID]: { type: 'choice' as const, choice: 'x', probabilities: {}, confidence: 1 } },
+          usage: { input_tokens: 1, output_tokens: 1 },
+        };
+      },
+    };
+    await assert.rejects(() => isJawgyi('\u1000\u1033', wrong), /Expected a noul/);
   });
 });
 

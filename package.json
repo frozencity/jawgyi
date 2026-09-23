@@ -40,7 +40,9 @@
     "derive": "node scripts/derive-codepoints.mjs",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "cross-check": "npm run build && node scripts/cross-check.mjs",
-    "calibrate:dry": "npm run build && node scripts/calibrate.mjs --dry-run"
+    "calibrate:dry": "npm run build && node scripts/calibrate.mjs --dry-run",
+    "compare": "npm run build && node scripts/compare.mjs",
+    "compare:dry": "npm run build && node scripts/compare.mjs --dry-run"
   },
   "devDependencies": {
     "typescript": "^5.7.0",
