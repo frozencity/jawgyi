@@ -8,13 +8,50 @@ Zawgyi vs Unicode detection for Burmese text.
 npm install jawgyi
 ```
 
+## isJawgyi
+
+The function the package is named for.
+
 ```ts
-import { detectSync, toUnicode } from 'jawgyi';
+import { isJawgyi, JevClient } from 'jawgyi';
 
-detectSync(text).encoding; // 'unicode' | 'zawgyi' | null
+const client = new JevClient({ model: 'jev-1.13.0' }); // reads TYPESAFE_API_KEY
+const v = await isJawgyi(text, client);
 
-const { text: clean, converted } = await toUnicode(text);
+v.zawgyi;    // the answer, thresholded at 0.5
+v.noul;      // the raw probability
+v.stage1;    // the local detector's verdict for the same text
+v.disagrees; // whether the two reached different verdicts
 ```
+
+It sends your text to Jev as state along with a single Noul question, "is this text encoded in the Zawgyi font encoding rather than Unicode", and hands back the probability. One request per call. You will need a key from [console.typesafe.ai](https://console.typesafe.ai).
+
+One property of the setup is worth stating plainly, because it shapes what the answer means. Jev evaluates decoded code points, not bytes. The request body is JSON, so by the time it arrives the text has already been decoded by something upstream, and the original encoding is not part of what the model sees. The verdict is therefore inferred from the shape of the text rather than read off it.
+
+How well that works on Burmese is not something I can tell you. TypeSafe publishes no per-language benchmarks and Burmese is low resource. The `stage1` field is on the result so you can hold the answer next to a second opinion, and `npm run compare` scores it properly against text whose encoding is already known.
+
+## isZawgyi
+
+There is also a local one.
+
+```ts
+import { isZawgyi } from 'jawgyi';
+
+isZawgyi(text); // boolean
+```
+
+No key, no client, no network, no dependencies. Synchronous. It reads the code points directly, checks the ones that only ever occur in one of the two encodings, and falls back to a Markov classifier trained on Burmese text.
+
+Measured over all 308 lines of the parallel corpus in `test/fixtures`:
+
+| | requests | key | per call | accuracy on the corpus |
+|---|---|---|---|---|
+| `isJawgyi` | 1 | required | a network round trip | not yet measured |
+| `isZawgyi` | 0 | none | 0.0003 ms | 308/308, 100% |
+
+Run `npm run compare:dry` to see both the request `isJawgyi` would send and that baseline recomputed on your machine. It needs no key and sends nothing.
+
+If you want the version that can say "I don't know" rather than returning a boolean either way, that is `detectSync`, and the rest of this file is about why it exists.
 
 ## The problem with every detector I could find
 
@@ -50,7 +87,7 @@ It's three characters.
 
 At three characters the model is a coin flip wearing a lab coat, and there's a table below that proves it. So the confidence gets discounted and the answer is "I don't know."
 
-If you want the old behaviour, `isZawgyi(text)` returns a boolean and takes the guess. It's right there. I just refuse to make it the default.
+`isZawgyi` above returns a boolean either way, because sometimes a boolean is what you have room for. `detectSync` is the one that can decline, and it declines here.
 
 ## How it decides
 
@@ -132,25 +169,13 @@ The two extra questions exist because a single probability hides two specific fa
 
 Stage 2 abstains when Choice confidence is below 0.7, when Jev answers `neither`, when P(Burmese) drops under 0.5, or when it reports mixed encodings.
 
-### The direct route
+### Two ways to spend a request
 
-There is a second way to involve Jev, and it is one function:
+`detect` is the decomposed one described above: code builds both candidate readings, Jev picks which is coherent Burmese, and two extra Nouls ride along in the same request.
 
-```ts
-import { isJawgyi, JevClient } from 'jawgyi';
+[`isJawgyi`](#isjawgyi) at the top of this file is the other. One Noul, text as state, no decomposition.
 
-const v = await isJawgyi(text, new JevClient());
-v.zawgyi;    // the Noul thresholded at 0.5
-v.noul;      // the raw probability
-v.stage1;    // what the local detector said about the same text
-v.disagrees; // whether they reached different verdicts
-```
-
-It sends the text as state and asks one Noul, "is this Zawgyi". No decomposition, no candidate readings.
-
-The constraint from further up still applies: Jev evaluates decoded code points, not bytes, so the source encoding is not present in what it sees. The answer is inferred from the shape of the text. That is not an argument against it, it is just what the function is doing, and `v.stage1` is on the result so you can hold the two answers side by side.
-
-If you want to know which to use, measure it. `npm run compare` scores `isJawgyi`, `isZawgyi` and the corpus against each other and prints accuracy, request count and wall time. `npm run compare:dry` shows the request and the local baseline without sending anything or needing a key.
+They are not the same shape and they will not have the same accuracy. `npm run compare` scores both against text of known encoding, next to the local detector, and prints accuracy, request count and wall time. `npm run compare:dry` shows the request and the local baseline without a key.
 
 ## What I don't know
 
@@ -184,11 +209,11 @@ If accuracy comes back near chance, ship stage 1 alone. The library works fine w
 
 | Export | |
 |---|---|
-| `detectSync(text, opts?)` | Local only. Returns `Detection`. Never throws, never blocks. |
+| `isJawgyi(text, client, model?)` | Async, one request. Asks Jev whether the text is Zawgyi. Returns the probability plus the local verdict for comparison. Needs a key. |
+| `isZawgyi(text, opts?)` | Boolean. Local, synchronous, no key. Accepts a guess on weak evidence. |
+| `detectSync(text, opts?)` | Local only. Returns `Detection`, which can be `null`. Never throws, never blocks. |
 | `detect(text, opts?)` | Async. Escalates to Jev when `opts.client` is set and stage 1 is weak. |
 | `toUnicode(text, opts?)` | `{ text, detection, converted }`. Converts only on a confident Zawgyi verdict. |
-| `isZawgyi(text, opts?)` | Boolean. Local, synchronous. Accepts a guess on weak evidence. |
-| `isJawgyi(text, client, model?)` | Async. One Noul asking Jev whether the text is Zawgyi. Returns the probability and the local verdict for comparison. |
 | `zawgyiToUnicode` / `unicodeToZawgyi` / `normalizeZawgyi` | Transliteration. |
 | `JevClient` | Zero-dependency client for `POST /v1/systemone`, retries 429/529. |
 | `scanCodepoints` | Raw evidence counts, if you want your own policy. |
